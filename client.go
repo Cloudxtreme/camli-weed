@@ -53,6 +53,17 @@ func NewClient(masterURL string, dbDir string) (c *Client, err error) {
 
 // Get returns the file data as an io.ReadCloser, and the size
 func (c *Client) Get(key string) (file io.ReadCloser, size int64, err error) {
+	fileID, s, e := c.dbGet(key)
+	if e != nil {
+		err = e
+		return
+	}
+	size = s
+	file, err = c.weed.Download(fileID)
+	return
+}
+
+func (c *Client) dbGet(key string) (fileID string, size int64, err error) {
 	val, e := c.db.Get(nil, []byte(key))
 	if e != nil {
 		err = fmt.Errorf("error getting key %q from db: %s", key, e)
@@ -62,12 +73,7 @@ func (c *Client) Get(key string) (file io.ReadCloser, size int64, err error) {
 		err = fmt.Errorf("%q not found in db", key)
 		return
 	}
-	var obj Object
-	if err = decodeVal(&obj, val); err != nil {
-		return
-	}
-	size = obj.Size
-	file, err = c.weed.Download(obj.FileID)
+	err = decodeVal(val, &fileID, &size)
 	return
 }
 
@@ -79,10 +85,11 @@ func (c *Client) Put(key string, size int64, file io.Reader) error {
 	}
 	var obj Object
 	if obj.FileID, err = c.weed.Upload(key, "application/octet-stream", file); err != nil {
+		c.db.Rollback()
 		return err
 	}
 	obj.Size = size
-	val, err := encodeVal(obj)
+	val, err := encodeVal(nil, obj.FileID, size)
 	if err != nil {
 		return err
 	}
@@ -90,6 +97,32 @@ func (c *Client) Put(key string, size int64, file io.Reader) error {
 		return fmt.Errorf("error setting key %q to %q: %s", key, obj, err)
 	}
 	return c.db.Commit()
+}
+
+// Delete deletes the key from the backing Weed-FS and from the local db
+func (c *Client) Delete(key string) error {
+	fileID, _, err := c.dbGet(key)
+	if err != nil {
+		return err
+	}
+	if err = c.db.BeginTransaction(); err != nil {
+		return err
+	}
+	if err = c.db.Delete([]byte(key)); err != nil {
+		c.db.Rollback()
+		return err
+	}
+	if err = c.weed.Delete(fileID); err != nil {
+		c.db.Rollback()
+		return err
+	}
+	return c.db.Commit()
+}
+
+// Stat returns the size of the key's file
+func (c *Client) Stat(key string) (int64, error) {
+	_, size, err := c.dbGet(key)
+	return size, err
 }
 
 // Check checks the master's availability
@@ -100,6 +133,7 @@ func (c *Client) Check() error {
 
 // Object holds the info about an object: the keys and size
 type Object struct {
+	Key    string // Camlistore's key: the blobref
 	FileID string // Weed-FS' key: the fileID
 	Size   int64  // Size is the object's size
 }
@@ -123,7 +157,8 @@ func (c *Client) List(after string, limit int) ([]Object, error) {
 			}
 			break
 		}
-		if err = decodeVal(&obj, val); err != nil {
+		obj.Key = string(key)
+		if err = decodeVal(val, &obj.FileID, &obj.Size); err != nil {
 			return nil, err
 		}
 		objs = append(objs, obj)
@@ -131,11 +166,24 @@ func (c *Client) List(after string, limit int) ([]Object, error) {
 	return objs, nil
 }
 
-func encodeVal(obj Object) ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0, 128))
-	err := gob.NewEncoder(buf).Encode(obj)
+func encodeVal(dst []byte, fileID string, size int64) ([]byte, error) {
+	if dst == nil {
+		dst = make([]byte, 0, 48)
+	}
+	buf := bytes.NewBuffer(dst)
+	enc := gob.NewEncoder(buf)
+	err := enc.Encode(size)
+	if err != nil {
+		return nil, err
+	}
+	err = enc.Encode(fileID)
 	return buf.Bytes(), err
 }
-func decodeVal(obj *Object, val []byte) error {
-	return gob.NewDecoder(bytes.NewReader(val)).Decode(obj)
+func decodeVal(val []byte, fileID *string, size *int64) error {
+	dec := gob.NewDecoder(bytes.NewReader(val))
+	err := dec.Decode(size)
+	if err != nil {
+		return err
+	}
+	return dec.Decode(fileID)
 }
