@@ -22,7 +22,15 @@ import (
 	"camlistore.org/pkg/blobref"
 )
 
-func (sto *weedStorage) StatBlobs(dest chan<- blobref.SizedBlobRef, blobs []*blobref.BlobRef, wait time.Duration) error {
+// Stat checks for the existence of blobs, writing their sizes
+// (if found back to the dest channel), and returning an error
+// or nil.  Stat() should NOT close the channel.
+// wait is the max time to wait for the blobs to exist,
+// or 0 for no delay.
+func (sto *weedStorage) StatBlobs(dest chan<- blobref.SizedBlobRef,
+	blobs []*blobref.BlobRef,
+	wait time.Duration) error {
+
 	// TODO: do n stats in parallel
 	for _, br := range blobs {
 		size, err := sto.weedClient.Stat(br.String())
