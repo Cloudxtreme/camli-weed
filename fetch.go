@@ -19,10 +19,10 @@ package camliWeed
 import (
 	"io"
 
-	"camlistore.org/pkg/blobref"
+	"camlistore.org/pkg/blob"
 )
 
-func (sto *weedStorage) FetchStreaming(blob *blobref.BlobRef) (file io.ReadCloser, size int64, reterr error) {
-	file, size, reterr = sto.weedClient.Get(blob.String())
+func (sto *weedStorage) FetchStreaming(b blob.Ref) (file io.ReadCloser, size int64, reterr error) {
+	file, size, reterr = sto.weedClient.Get(b.String())
 	return
 }

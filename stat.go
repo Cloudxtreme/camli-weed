@@ -19,7 +19,7 @@ package camliWeed
 import (
 	"time"
 
-	"camlistore.org/pkg/blobref"
+	"camlistore.org/pkg/blob"
 )
 
 // Stat checks for the existence of blobs, writing their sizes
@@ -27,15 +27,15 @@ import (
 // or nil.  Stat() should NOT close the channel.
 // wait is the max time to wait for the blobs to exist,
 // or 0 for no delay.
-func (sto *weedStorage) StatBlobs(dest chan<- blobref.SizedBlobRef,
-	blobs []*blobref.BlobRef,
+func (sto *weedStorage) StatBlobs(dest chan<- blob.SizedRef,
+	blobs []blob.Ref,
 	wait time.Duration) error {
 
 	// TODO: do n stats in parallel
 	for _, br := range blobs {
 		size, err := sto.weedClient.Stat(br.String())
 		if err == nil {
-			dest <- blobref.SizedBlobRef{BlobRef: br, Size: size}
+			dest <- blob.SizedRef{Ref: br, Size: size}
 		} else {
 			// TODO: handle
 		}

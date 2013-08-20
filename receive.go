@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"camlistore.org/pkg/blobref"
+	"camlistore.org/pkg/blob"
 	"camlistore.org/pkg/blobserver"
 )
 
@@ -31,13 +31,13 @@ const maxInMemorySlurp = 4 << 20 // 4MB.  *shrug*
 // netSlurper slurps up a blob to memory (or spilling to disk if
 // over maxInMemorySlurp) to verify its digest
 type netSlurper struct {
-	blob    *blobref.BlobRef // only used for tempfile's prefix
+	blob    blob.Ref // only used for tempfile's prefix
 	buf     *bytes.Buffer
 	file    *os.File // nil until allocated
 	reading bool     // transitions at most once from false -> true
 }
 
-func newNetSlurper(blob *blobref.BlobRef) *netSlurper {
+func newNetSlurper(blob blob.Ref) *netSlurper {
 	return &netSlurper{
 		blob: blob,
 		buf:  new(bytes.Buffer),
@@ -89,22 +89,22 @@ func (ns *netSlurper) Cleanup() {
 	}
 }
 
-func (sto *weedStorage) ReceiveBlob(blob *blobref.BlobRef, source io.Reader) (outsb blobref.SizedBlobRef, outerr error) {
+func (sto *weedStorage) ReceiveBlob(b blob.Ref, source io.Reader) (outsb blob.SizedRef, outerr error) {
 	zero := outsb
-	slurper := newNetSlurper(blob)
+	slurper := newNetSlurper(b)
 	defer slurper.Cleanup()
 
-	hash := blob.Hash()
+	hash := b.Hash()
 	size, err := io.Copy(io.MultiWriter(hash, slurper), source)
 	if err != nil {
 		return zero, err
 	}
-	if !blob.HashMatches(hash) {
+	if !b.HashMatches(hash) {
 		return zero, blobserver.ErrCorruptBlob
 	}
-	err = sto.weedClient.Put(blob.String(), size, slurper)
+	err = sto.weedClient.Put(b.String(), size, slurper)
 	if err != nil {
 		return zero, err
 	}
-	return blobref.SizedBlobRef{BlobRef: blob, Size: size}, nil
+	return blob.SizedRef{Ref: b, Size: size}, nil
 }

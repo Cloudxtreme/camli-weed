@@ -17,14 +17,14 @@ limitations under the License.
 package camliWeed
 
 import (
-	"camlistore.org/pkg/blobref"
+	"camlistore.org/pkg/blob"
 )
 
-func (sto *weedStorage) RemoveBlobs(blobs []*blobref.BlobRef) error {
+func (sto *weedStorage) RemoveBlobs(blobs []blob.Ref) error {
 	// TODO: do these in parallel
 	var reterr error
-	for _, blob := range blobs {
-		if err := sto.weedClient.Delete(blob.String()); err != nil {
+	for _, b := range blobs {
+		if err := sto.weedClient.Delete(b.String()); err != nil {
 			reterr = err
 		}
 	}

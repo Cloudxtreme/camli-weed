@@ -20,7 +20,7 @@ import (
 	"log"
 	"time"
 
-	"camlistore.org/pkg/blobref"
+	"camlistore.org/pkg/blob"
 	"camlistore.org/pkg/blobserver"
 )
 
@@ -28,19 +28,23 @@ var _ blobserver.MaxEnumerateConfig = (*weedStorage)(nil)
 
 func (sto *weedStorage) MaxEnumerate() int { return 1000 }
 
-func (sto *weedStorage) EnumerateBlobs(dest chan<- blobref.SizedBlobRef, after string, limit int, wait time.Duration) error {
+func (sto *weedStorage) EnumerateBlobs(dest chan<- blob.SizedRef, after string, limit int, wait time.Duration) error {
 	defer close(dest)
 	objs, err := sto.weedClient.List(after, limit)
 	if err != nil {
 		log.Printf("weed List: %v", err)
 		return err
 	}
+	var (
+		ok bool
+		br blob.Ref
+	)
 	for _, obj := range objs {
-		br := blobref.Parse(obj.Key)
-		if br == nil {
+		br, ok = blob.Parse(obj.Key)
+		if !ok {
 			continue
 		}
-		dest <- blobref.SizedBlobRef{BlobRef: br, Size: obj.Size}
+		dest <- blob.SizedRef{Ref: br, Size: obj.Size}
 	}
 	return nil
 }

@@ -144,7 +144,12 @@ func (c *Client) List(after string, limit int) ([]Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	objs := make([]Object, 0, 512)
+	n := limit / 2
+	if limit < 1000 {
+		n = limit
+	}
+
+	objs := make([]Object, 0, n)
 	var (
 		key, val []byte
 		obj      Object
