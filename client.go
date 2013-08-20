@@ -22,7 +22,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/cznic/kv"
@@ -40,13 +39,14 @@ var kvOptions = new(kv.Options)
 // NewClient creates a new client for the Weed-FS' masterURL
 // using the given dbDir for the local DB.
 func NewClient(masterURL string, dbDir string) (c *Client, err error) {
-	c.weed = weed.NewWeedClient(masterURL)
+	c = &Client{weed: weed.NewWeedClient(masterURL)}
 	name := filepath.Join(dbDir,
 		"camli-"+base64.URLEncoding.EncodeToString([]byte(masterURL))+".db")
 	if c.db, err = kv.Open(name, kvOptions); err != nil {
-		if _, ok := err.(*os.PathError); ok {
-			c.db, err = kv.Create(name, kvOptions)
-		}
+		c.db, err = kv.Create(name, kvOptions)
+	}
+	if err == nil && c.db == nil {
+		err = fmt.Errorf("couldn't create db as %s", name)
 	}
 	return
 }

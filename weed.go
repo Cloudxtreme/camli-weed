@@ -40,17 +40,21 @@ import (
 type weedStorage struct {
 	*blobserver.SimpleBlobHubPartitionMap
 	weedClient *Client
-	masterURL  string
 }
 
 func newFromConfig(_ blobserver.Loader, config jsonconfig.Obj) (storage blobserver.Storage, err error) {
-	stor := &weedStorage{
-		SimpleBlobHubPartitionMap: &blobserver.SimpleBlobHubPartitionMap{},
-		masterURL:                 config.RequiredString("master"),
-	}
+	masterURL, dbDir := config.RequiredString("masterURL"), config.RequiredString("dbDir")
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
+	stor := &weedStorage{
+		SimpleBlobHubPartitionMap: &blobserver.SimpleBlobHubPartitionMap{},
+	}
+	fmt.Printf("stor=%#v\n", stor)
+	if stor.weedClient, err = NewClient(masterURL, dbDir); err != nil || stor.weedClient == nil {
+		return nil, fmt.Errorf("Cannot create client: %s", err)
+	}
+	fmt.Printf("stor=%#v\n", stor)
 	if err = stor.weedClient.Check(); err != nil {
 		return nil, fmt.Errorf("Weed master check error: %s", err)
 	}
