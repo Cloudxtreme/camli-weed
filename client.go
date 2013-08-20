@@ -43,7 +43,11 @@ func NewClient(masterURL string, dbDir string) (c *Client, err error) {
 	name := filepath.Join(dbDir,
 		"camli-"+base64.URLEncoding.EncodeToString([]byte(masterURL))+".db")
 	if c.db, err = kv.Open(name, kvOptions); err != nil {
-		c.db, err = kv.Create(name, kvOptions)
+        var e error
+		c.db, e = kv.Create(name, kvOptions)
+        if e != nil {
+            err = fmt.Errorf("open error: %s; create error: %s", err ,e)
+        }
 	}
 	if err == nil && c.db == nil {
 		err = fmt.Errorf("couldn't create db as %s", name)
