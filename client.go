@@ -85,45 +85,56 @@ func (c *Client) dbGet(key string) (fileID string, size int64, err error) {
 }
 
 // Put stores the file data
-func (c *Client) Put(key string, size int64, file io.Reader) error {
-	err := c.db.BeginTransaction()
-	if err != nil {
+func (c *Client) Put(key string, size int64, file io.Reader) (err error) {
+	if err = c.db.BeginTransaction(); err != nil {
 		return fmt.Errorf("error beginning transaction: %s", err)
 	}
+	defer func() {
+		if err != nil {
+			c.db.Rollback()
+		}
+	}()
+
 	var obj Object
 	if obj.FileID, err = c.weed.Upload(key, "application/octet-stream", file); err != nil {
-		c.db.Rollback()
-		return err
+		return
 	}
 	obj.Size = size
-	val, err := encodeVal(nil, obj.FileID, size)
-	if err != nil {
-		return err
+	val, e := encodeVal(nil, obj.FileID, size)
+	if e != nil {
+		err = e
+		return
 	}
 	if err = c.db.Set([]byte(key), val); err != nil {
-		c.db.Rollback()
-		return fmt.Errorf("error setting key %q to %q: %s", key, obj, err)
+		err = fmt.Errorf("error setting key %q to %q: %s", key, obj, err)
+		return
 	}
+	err = nil
 	return c.db.Commit()
 }
 
 // Delete deletes the key from the backing Weed-FS and from the local db
-func (c *Client) Delete(key string) error {
-	fileID, _, err := c.dbGet(key)
-	if err != nil {
-		return err
+func (c *Client) Delete(key string) (err error) {
+	fileID, _, e := c.dbGet(key)
+	if e != nil {
+		return e
 	}
 	if err = c.db.BeginTransaction(); err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			c.db.Rollback()
+		}
+	}()
+
 	if err = c.db.Delete([]byte(key)); err != nil {
-		c.db.Rollback()
-		return err
+		return
 	}
 	if err = c.weed.Delete(fileID); err != nil {
-		c.db.Rollback()
-		return err
+		return
 	}
+	err = nil
 	return c.db.Commit()
 }
 
