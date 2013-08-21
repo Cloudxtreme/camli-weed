@@ -36,7 +36,7 @@ type Client struct {
 
 // kvOptions returns the usable kv.Options - according to cnic, reuse may be unsafe
 func kvOptions() *kv.Options {
-    return new(kv.Options)
+	return new(kv.Options)
 }
 
 // NewClient creates a new client for the Weed-FS' masterURL
@@ -46,11 +46,11 @@ func NewClient(masterURL string, dbDir string) (c *Client, err error) {
 	name := filepath.Join(dbDir,
 		"camli-"+base64.URLEncoding.EncodeToString([]byte(masterURL))+".db")
 	if c.db, err = kv.Open(name, kvOptions()); err != nil {
-        var e error
+		var e error
 		c.db, e = kv.Create(name, kvOptions())
-        if e != nil {
-            err = fmt.Errorf("open error: %s; create error: %s", err ,e)
-        }
+		if e != nil {
+			err = fmt.Errorf("open error: %s; create error: %s", err, e)
+		}
 	}
 	if err == nil && c.db == nil {
 		err = fmt.Errorf("couldn't create db as %s", name)
@@ -101,6 +101,7 @@ func (c *Client) Put(key string, size int64, file io.Reader) error {
 		return err
 	}
 	if err = c.db.Set([]byte(key), val); err != nil {
+		c.db.Rollback()
 		return fmt.Errorf("error setting key %q to %q: %s", key, obj, err)
 	}
 	return c.db.Commit()
