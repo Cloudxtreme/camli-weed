@@ -38,7 +38,7 @@ import (
 )
 
 type weedStorage struct {
-	*blobserver.SimpleBlobHubPartitionMap
+	//*blobserver.SimpleBlobHubPartitionMap
 	weedClient *Client
 }
 
@@ -47,9 +47,7 @@ func newFromConfig(_ blobserver.Loader, config jsonconfig.Obj) (storage blobserv
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
-	stor := &weedStorage{
-		SimpleBlobHubPartitionMap: &blobserver.SimpleBlobHubPartitionMap{},
-	}
+	stor := new(weedStorage)
 	fmt.Printf("stor=%#v\n", stor)
 	if stor.weedClient, err = NewClient(masterURL, dbDir); err != nil || stor.weedClient == nil {
 		return nil, fmt.Errorf("Cannot create client: %s", err)

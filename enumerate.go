@@ -18,7 +18,6 @@ package camliWeed
 
 import (
 	"log"
-	"time"
 
 	"camlistore.org/pkg/blob"
 	"camlistore.org/pkg/blobserver"
@@ -28,7 +27,7 @@ var _ blobserver.MaxEnumerateConfig = (*weedStorage)(nil)
 
 func (sto *weedStorage) MaxEnumerate() int { return 1000 }
 
-func (sto *weedStorage) EnumerateBlobs(dest chan<- blob.SizedRef, after string, limit int, wait time.Duration) error {
+func (sto *weedStorage) EnumerateBlobs(dest chan<- blob.SizedRef, after string, limit int) error {
 	defer close(dest)
 	objs, err := sto.weedClient.List(after, limit)
 	if err != nil {
